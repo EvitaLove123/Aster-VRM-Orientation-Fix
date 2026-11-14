@@ -34,6 +34,7 @@ button.secondary,.fileBtn.secondary{background:var(--pale);color:#315eb9;border:
 <div style="padding:12px" class="row">
 <label class="fileBtn" style="flex:1">Choose VRM file<input id="file" type="file" accept=".vrm,model/gltf-binary"></label>
 <button class="secondary" id="resetView" style="flex:1">Reset view</button>
+<button id="download" disabled style="flex:1">Download VRM</button>
 </div>
 </section>
 <section class="card">
@@ -81,7 +82,7 @@ const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(3,5,4);scene
 const grid=new THREE.GridHelper(10,20,0x9bb0d0,0xd4deec);scene.add(grid);
 const axes=new THREE.AxesHelper(1.2);scene.add(axes);
 const pivot=new THREE.Group();scene.add(pivot);
-let currentVrm=null, drag=false,lastX=0,lastY=0,viewYaw=0,viewPitch=0,zoom=4.5;
+let currentVrm=null, originalBuffer=null, originalFileName="avatar.vrm", drag=false,lastX=0,lastY=0,viewYaw=0,viewPitch=0,zoom=4.5;
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
 new ResizeObserver(resize).observe(stage);resize();
 function render(){requestAnimationFrame(render);if(drag){}camera.position.set(Math.sin(viewYaw)*zoom,1.35+viewPitch,Math.cos(viewYaw)*zoom);camera.lookAt(0,1,0);renderer.render(scene,camera)}render();
@@ -95,10 +96,27 @@ function setRot(x,y,z){[['rx',x],['ry',y],['rz',z]].forEach(([id,v])=>{document.
 document.querySelectorAll('[data-rotate]').forEach(b=>b.addEventListener('click',()=>setRot(...b.dataset.rotate.split(',').map(Number))));
 document.getElementById('zero').onclick=()=>setRot(0,0,0);
 document.getElementById('resetView').onclick=()=>{viewYaw=0;viewPitch=0;zoom=4.5};
-document.getElementById('center').onclick=()=>{if(!currentVrm)return;const box=new THREE.Box3().setFromObject(currentVrm.scene);const c=box.getCenter(new THREE.Vector3());pivot.position.x-=c.x;pivot.position.z-=c.z;setStatus('Preview centered. The source file remains unchanged.','good')};
-document.getElementById('ground').onclick=()=>{if(!currentVrm)return;const box=new THREE.Box3().setFromObject(pivot);pivot.position.y-=box.min.y;setStatus('Ground alignment applied to the preview only.','good')};
+document.getElementById('ground').onclick=()=>{if(!currentVrm)return;const box=new THREE.Box3().setFromObject(pivot);pivot.position.y-=box.min.y;setStatus('Ground alignment applied. Download VRM to save this adjustment.','good')};
+document.getElementById('center').onclick=()=>{if(!currentVrm)return;const box=new THREE.Box3().setFromObject(currentVrm.scene);const c=box.getCenter(new THREE.Vector3());pivot.position.x-=c.x;pivot.position.z-=c.z;setStatus('Preview centered. Download VRM to save this adjustment.','good')};
+function makeAdjustedVrm(){
+ if(!originalBuffer||!currentVrm)throw new Error('Load a VRM first.');
+ const src=new Uint8Array(originalBuffer);const view=new DataView(originalBuffer);
+ if(view.getUint32(0,true)!==0x46546c67||view.getUint32(4,true)!==2)throw new Error('This file is not a valid GLB 2.0 VRM.');
+ let offset=12,json=null,chunks=[];
+ while(offset+8<=src.length){const length=view.getUint32(offset,true),type=view.getUint32(offset+4,true);const start=offset+8,end=start+length;if(end>src.length)throw new Error('GLB chunk length is invalid.');const bytes=src.slice(start,end);if(type===0x4e4f534a){if(json)throw new Error('GLB contains multiple JSON chunks.');json=JSON.parse(new TextDecoder().decode(bytes).replace(/[\\u0000\\s]+$/g,''));}else chunks.push({type,bytes});offset=end;}
+ if(!json||!Array.isArray(json.scenes)||!Array.isArray(json.nodes))throw new Error('VRM scene structure could not be read.');
+ pivot.updateMatrix();const matrix=pivot.matrix.toArray();let wrapped=0;
+ for(const sceneDef of json.scenes){if(!Array.isArray(sceneDef.nodes)||sceneDef.nodes.length===0)continue;const roots=sceneDef.nodes.slice();const wrapperIndex=json.nodes.length;json.nodes.push({name:'Aster_Orientation_Adjustment',matrix,children:roots});sceneDef.nodes=[wrapperIndex];wrapped++;}
+ if(!wrapped)throw new Error('No scene root nodes were found to apply the adjustment.');
+ const encoder=new TextEncoder();let jsonBytes=encoder.encode(JSON.stringify(json));const paddedJsonLength=Math.ceil(jsonBytes.length/4)*4;const paddedJson=new Uint8Array(paddedJsonLength);paddedJson.fill(0x20);paddedJson.set(jsonBytes);
+ const totalLength=12+8+paddedJson.length+chunks.reduce((n,c)=>n+8+c.bytes.length,0);const out=new Uint8Array(totalLength);const outView=new DataView(out.buffer);outView.setUint32(0,0x46546c67,true);outView.setUint32(4,2,true);outView.setUint32(8,totalLength,true);let p=12;outView.setUint32(p,paddedJson.length,true);outView.setUint32(p+4,0x4e4f534a,true);out.set(paddedJson,p+8);p+=8+paddedJson.length;
+ for(const chunk of chunks){outView.setUint32(p,chunk.bytes.length,true);outView.setUint32(p+4,chunk.type,true);out.set(chunk.bytes,p+8);p+=8+chunk.bytes.length;}
+ return out;
+}
+document.getElementById('download').onclick=()=>{try{const bytes=makeAdjustedVrm();const blob=new Blob([bytes],{type:'model/gltf-binary'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=originalFileName.replace(/\\.vrm$/i,'')+'_oriented.vrm';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus('Adjusted VRM exported. Re-import the downloaded file into your target app to test it.','good');}catch(err){console.error(err);setStatus('Export failed: '+err.message,'warn')}};
 document.getElementById('file').addEventListener('change',async e=>{
  const file=e.target.files?.[0];if(!file)return;
+ document.getElementById('download').disabled=true;originalBuffer=null;
  if(!file.name.toLowerCase().endsWith('.vrm')){setStatus('Please choose a .vrm file.','warn');return}
  setStatus('Loading model locally…');
  try{
@@ -106,7 +124,7 @@ document.getElementById('file').addEventListener('change',async e=>{
   const buffer=await file.arrayBuffer();const gltf=await new Promise((resolve,reject)=>loader.parse(buffer,'',resolve,reject));
   const vrm=gltf.userData.vrm;if(!vrm)throw new Error('No VRM metadata was detected. The file may not be a supported VRM.');
   if(currentVrm){pivot.remove(currentVrm.scene);VRM.dispose?.(currentVrm)}
-  currentVrm=vrm;pivot.clear();pivot.add(vrm.scene);pivot.position.set(0,0,0);setRot(0,0,0);
+  currentVrm=vrm;originalBuffer=buffer.slice(0);originalFileName=file.name;pivot.clear();pivot.add(vrm.scene);pivot.position.set(0,0,0);pivot.scale.set(1,1,1);setRot(0,0,0);document.getElementById('download').disabled=false;
   const box=new THREE.Box3().setFromObject(vrm.scene),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
   const maxDim=Math.max(size.x,size.y,size.z)||1;zoom=Math.max(2.3,Math.min(8,maxDim*2.3));viewYaw=0;viewPitch=0;
   camera.near=Math.max(.001,maxDim/1000);camera.far=maxDim*100;camera.updateProjectionMatrix();
