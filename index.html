@@ -26,6 +26,7 @@ button.secondary,.fileBtn.secondary{background:var(--pale);color:#315eb9;border:
 <h1>✦ Aster VRM Orientation Fix</h1>
 <p>Inspect model orientation and test safe preview adjustments — directly in your browser.</p>
 <span class="tag">Android friendly</span><span class="tag">Local file processing</span><span class="tag">VRM 0.x / 1.0 loader</span>
+<div style="margin-top:12px"><button id="download" disabled style="width:100%;min-height:50px;font-size:16px">⬇ Download adjusted VRM</button><p class="small" id="downloadHint">Load a VRM model first — this button stays here at the top.</p></div>
 </header>
 <main>
 <section class="card viewer">
@@ -35,10 +36,7 @@ button.secondary,.fileBtn.secondary{background:var(--pale);color:#315eb9;border:
 <label class="fileBtn" style="flex:1">Choose VRM file<input id="file" type="file" accept=".vrm,model/gltf-binary"></label>
 <button class="secondary" id="resetView" style="flex:1">Reset view</button>
 </div>
-<div style="padding:0 12px 12px">
-<button id="download" disabled style="width:100%;min-height:48px">⬇ Download adjusted VRM</button>
-<p class="small" style="margin-top:6px">Load a VRM first. The button becomes active after the model loads.</p>
-</div>
+
 </section>
 <section class="card">
 <h2 class="sectionTitle">Orientation controls</h2>
@@ -119,7 +117,7 @@ function makeAdjustedVrm(){
 document.getElementById('download').onclick=()=>{try{const bytes=makeAdjustedVrm();const blob=new Blob([bytes],{type:'model/gltf-binary'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=originalFileName.replace(/\.vrm$/i,'')+'_oriented.vrm';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus('Adjusted VRM exported. Re-import the downloaded file into your target app to test it.','good');}catch(err){console.error(err);setStatus('Export failed: '+err.message,'warn')}};
 document.getElementById('file').addEventListener('change',async e=>{
  const file=e.target.files?.[0];if(!file)return;
- document.getElementById('download').disabled=true;originalBuffer=null;
+ document.getElementById('download').disabled=true;document.getElementById('downloadHint').textContent='Loading VRM…';originalBuffer=null;
  if(!file.name.toLowerCase().endsWith('.vrm')){setStatus('Please choose a .vrm file.','warn');return}
  setStatus('Loading model locally…');
  try{
@@ -127,7 +125,7 @@ document.getElementById('file').addEventListener('change',async e=>{
   const buffer=await file.arrayBuffer();const gltf=await new Promise((resolve,reject)=>loader.parse(buffer,'',resolve,reject));
   const vrm=gltf.userData.vrm;if(!vrm)throw new Error('No VRM metadata was detected. The file may not be a supported VRM.');
   if(currentVrm){pivot.remove(currentVrm.scene);VRM.dispose?.(currentVrm)}
-  currentVrm=vrm;originalBuffer=buffer.slice(0);originalFileName=file.name;pivot.clear();pivot.add(vrm.scene);pivot.position.set(0,0,0);pivot.scale.set(1,1,1);setRot(0,0,0);document.getElementById('download').disabled=false;
+  currentVrm=vrm;originalBuffer=buffer.slice(0);originalFileName=file.name;pivot.clear();pivot.add(vrm.scene);pivot.position.set(0,0,0);pivot.scale.set(1,1,1);setRot(0,0,0);document.getElementById('download').disabled=false;document.getElementById('downloadHint').textContent='Model loaded. Download the adjusted VRM here.';
   const box=new THREE.Box3().setFromObject(vrm.scene),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
   const maxDim=Math.max(size.x,size.y,size.z)||1;zoom=Math.max(2.3,Math.min(8,maxDim*2.3));viewYaw=0;viewPitch=0;
   camera.near=Math.max(.001,maxDim/1000);camera.far=maxDim*100;camera.updateProjectionMatrix();
