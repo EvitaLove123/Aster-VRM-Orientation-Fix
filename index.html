@@ -31,10 +31,13 @@ button.secondary,.fileBtn.secondary{background:var(--pale);color:#315eb9;border:
 <section class="card viewer">
 <div class="viewerTop"><strong>3D Preview</strong><span class="small" id="modelName">No model loaded</span></div>
 <div class="stage" id="stage"><div class="hint">Drag to rotate view · Pinch or scroll to zoom</div></div>
-<div style="padding:12px" class="row">
+<div style="padding:12px 12px 6px" class="row">
 <label class="fileBtn" style="flex:1">Choose VRM file<input id="file" type="file" accept=".vrm,model/gltf-binary"></label>
 <button class="secondary" id="resetView" style="flex:1">Reset view</button>
-<button id="download" disabled style="flex:1">Download VRM</button>
+</div>
+<div style="padding:0 12px 12px">
+<button id="download" disabled style="width:100%;min-height:48px">⬇ Download adjusted VRM</button>
+<p class="small" style="margin-top:6px">Load a VRM first. The button becomes active after the model loads.</p>
 </div>
 </section>
 <section class="card">
