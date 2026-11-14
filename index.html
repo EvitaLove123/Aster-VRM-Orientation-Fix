@@ -118,6 +118,5 @@ document.getElementById('file').addEventListener('change',async e=>{
   setStatus(note,size.y<size.x||size.y<size.z?'warn':'good');
  }catch(err){console.error(err);setStatus('Could not load this VRM: '+err.message,'warn')}
 });
-if('serviceWorker' in navigator && location.protocol.startsWith('http')){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
 </script>
 </body></html>
