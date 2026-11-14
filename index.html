@@ -103,7 +103,7 @@ function makeAdjustedVrm(){
  const src=new Uint8Array(originalBuffer);const view=new DataView(originalBuffer);
  if(view.getUint32(0,true)!==0x46546c67||view.getUint32(4,true)!==2)throw new Error('This file is not a valid GLB 2.0 VRM.');
  let offset=12,json=null,chunks=[];
- while(offset+8<=src.length){const length=view.getUint32(offset,true),type=view.getUint32(offset+4,true);const start=offset+8,end=start+length;if(end>src.length)throw new Error('GLB chunk length is invalid.');const bytes=src.slice(start,end);if(type===0x4e4f534a){if(json)throw new Error('GLB contains multiple JSON chunks.');json=JSON.parse(new TextDecoder().decode(bytes).replace(/[\\u0000\\s]+$/g,''));}else chunks.push({type,bytes});offset=end;}
+ while(offset+8<=src.length){const length=view.getUint32(offset,true),type=view.getUint32(offset+4,true);const start=offset+8,end=start+length;if(end>src.length)throw new Error('GLB chunk length is invalid.');const bytes=src.slice(start,end);if(type===0x4e4f534a){if(json)throw new Error('GLB contains multiple JSON chunks.');json=JSON.parse(new TextDecoder().decode(bytes).replace(/[\u0000\s]+$/g,''));}else chunks.push({type,bytes});offset=end;}
  if(!json||!Array.isArray(json.scenes)||!Array.isArray(json.nodes))throw new Error('VRM scene structure could not be read.');
  pivot.updateMatrix();const matrix=pivot.matrix.toArray();let wrapped=0;
  for(const sceneDef of json.scenes){if(!Array.isArray(sceneDef.nodes)||sceneDef.nodes.length===0)continue;const roots=sceneDef.nodes.slice();const wrapperIndex=json.nodes.length;json.nodes.push({name:'Aster_Orientation_Adjustment',matrix,children:roots});sceneDef.nodes=[wrapperIndex];wrapped++;}
@@ -113,7 +113,7 @@ function makeAdjustedVrm(){
  for(const chunk of chunks){outView.setUint32(p,chunk.bytes.length,true);outView.setUint32(p+4,chunk.type,true);out.set(chunk.bytes,p+8);p+=8+chunk.bytes.length;}
  return out;
 }
-document.getElementById('download').onclick=()=>{try{const bytes=makeAdjustedVrm();const blob=new Blob([bytes],{type:'model/gltf-binary'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=originalFileName.replace(/\\.vrm$/i,'')+'_oriented.vrm';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus('Adjusted VRM exported. Re-import the downloaded file into your target app to test it.','good');}catch(err){console.error(err);setStatus('Export failed: '+err.message,'warn')}};
+document.getElementById('download').onclick=()=>{try{const bytes=makeAdjustedVrm();const blob=new Blob([bytes],{type:'model/gltf-binary'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=originalFileName.replace(/\.vrm$/i,'')+'_oriented.vrm';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus('Adjusted VRM exported. Re-import the downloaded file into your target app to test it.','good');}catch(err){console.error(err);setStatus('Export failed: '+err.message,'warn')}};
 document.getElementById('file').addEventListener('change',async e=>{
  const file=e.target.files?.[0];if(!file)return;
  document.getElementById('download').disabled=true;originalBuffer=null;
