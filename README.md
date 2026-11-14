@@ -6,17 +6,19 @@ An Android-first, browser-based VRM orientation preview tool.
 
 - Loads local VRM 0.x / VRM 1.0 files with `@pixiv/three-vrm`.
 - 3D preview with grid and XYZ axes.
-- Preview-only X/Y/Z rotation controls and quick rotation presets.
-- Preview-only ground alignment and centering.
+- X/Y/Z rotation controls and quick rotation presets.
+- Ground alignment and centering.
+- **Download VRM** exports a new `.vrm` with the current orientation/position adjustment applied as a glTF scene-root transform. Original binary resources and VRM extension data are retained.
 - Displays approximate model dimensions and file size.
 - Does not upload the selected model.
 
 ## Important limitations
 
-This is an initial preview build, not a complete VRM repair/exporter yet.
+This is an early export implementation, not a full VRM repair suite.
 
-- Rotation, centering and ground alignment currently affect only the preview scene.
-- The original VRM bytes are not rewritten and no corrected VRM is exported.
+- Export preserves the original GLB binary chunks and VRM extension JSON, then adds a parent scene node carrying the current preview transform. It does not rewrite humanoid bones or bake the transform into every mesh.
+- Test the exported file in your target apps (Virtual Droid, Napharmonia, VRM Posing Mobile, or Me/v); compatibility is not guaranteed for every importer.
+- Automatic orientation detection is heuristic; it cannot reliably infer every character's intended forward/up direction.
 - Automatic orientation detection is heuristic; it cannot reliably infer every character's intended forward/up direction.
 - Some model-specific import behavior may be caused by the target application rather than the VRM file.
 
